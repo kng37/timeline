@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>활동시간대 알아내기 v7.2 (프리폼 리사이즈 에디션)</title>
+    <!-- Tesseract.js (브라우저용 OCR 엔진) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Chart.js (그래프 렌더링) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SortableJS (Keep 스타일 유동적 드래그 앤 드롭 자동정렬) -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+:root {
+    /* 세련된 무광 다크 테마 컬러 파레트 */
+    --bg-canvas: #09090b;
+    --card-bg: #18181b;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --card-border-hover: rgba(255, 255, 255, 0.15);
+    --accent-blue: #3b82f6;
+    --accent-blue-dim: rgba(59, 130, 246, 0.15);
+    --accent-green: #10b981;
+    --accent-orange: #f59e0b;
+    --accent-red: #ef4444;
+    --text-main: #f4f4f5;
+    --text-sub: #a1a1aa;
+    --text-muted: #71717a;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    padding: 24px 32px 60px;
+    background-color: var(--bg-canvas);
+    color: var(--text-main);
+    margin: 0;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.01em;
+}
+
+/* ===== Header ===== */
+.header-container {
+    max-width: 1600px;
+    margin: 0 auto 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: rgba(24, 24, 27, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 16px 24px;
+    border-radius: 16px;
+    border: 1px solid var(--card-border);
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 16px;
+    z-index: 1000;
+}
+
+.header-title-wrap h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-title-wrap h1::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--accent-blue);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent-blue);
+}
+
+.header-title-wrap p {
+    margin: 4px 0 0 18px;
+    font-size: 13px;
+    color: var(--text-sub);
+}
+
+/* ===== Layout ===== */
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 1100px) {
+    .container { grid-template-columns: 1fr; }
+}
+
+.panel-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 200px;
+}
+
+/* ===== Cards ===== */
+.box {
+    background: var(--card-bg);
+    padding: 20px;
+    border-radius: var(--radius);
+    border: 1px solid var(--card-border);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+}
+.box:hover {
+    border-color: var(--card-border-hover);
+    box-shadow: var(--shadow-hover);
+}
+
+#emptyDashboard {
+    background: rgba(24, 24, 27, 0.5) !important;
+    border: 1px dashed var(--card-border);
+}
+
+/* Edit mode */
+.edit-mode-active .box {
+    border: 2px dashed var(--accent-orange) !important;
+    resize: both;
+    overflow: auto;
+    min-height: 160px;
+    min-width: 260px;
+    cursor: grab;
+}
+.edit-mode-active .box:active { cursor: grabbing; }
+
+.sortable-ghost {
+    opacity: 0.4 !important;
+    background-color: rgba(245, 158, 11, 0.05) !important;
+    border: 2px dashed var(--accent-orange) !important;
+}
+.sortable-drag {
+    cursor: grabbing !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+    opacity: 0.95 !important;
+    transform: scale(1.02);
+    z-index: 50;
+}
+
+h2 {
+    margin: 0 0 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--card-border);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+h3 {
+    margin: 28px 0 12px;
+    border-bottom: 1px solid var(--card-border);
+    padding-bottom: 8px;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+p {
+    margin: 8px 0;
+    font-size: 13px;
+    color: var(--text-sub);
+    line-height: 1.6;
+}
+
+/* ===== Buttons (Flat & Modern) ===== */
+button {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: inherit;
+}
+button:disabled {
+    background: #27272a !important;
+    cursor: not-allowed;
+    color: #52525b !important;
+}
+
+#analyzeBtn { background: var(--accent-blue); color: white; }
+#analyzeBtn:hover:not(:disabled) { background: #2563eb; }
+
+.btn-green { background: var(--accent-green); color: white; }
+.btn-green:hover:not(:disabled) { background: #059669; }
+
+.btn-orange { background: var(--accent-orange); color: white; }
+.btn-orange:hover:not(:disabled) { background: #d97706; }
+
+.btn-red { background: var(--accent-red); color: white; }
+.btn-red:hover:not(:disabled) { background: #dc2626; }
+
+/* ===== Forms & Inputs ===== */
+.file-input-group {
+    margin-bottom: 12px;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px dashed var(--card-border-hover);
+    border-radius: var(--radius-sm);
+    transition: border-color 0.2s;
+}
+.file-input-group:hover { border-color: var(--accent-blue); }
+
+input[type="file"] {
+    color: var(--text-sub);
+    font-size: 13px;
+    width: 100%;
+}
+
+.loading {
+    color: var(--accent-orange);
+    font-weight: 600;
+    display: none;
+    margin-top: 12px;
+    font-size: 13px;
+    text-align: center;
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+select, input[type="number"], textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: #09090b;
+    color: var(--text-main);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    outline: none;
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+select:focus, input[type="number"]:focus, textarea:focus { 
+    border-color: var(--accent-blue); 
+    box-shadow: 0 0 0 2px var(--accent-blue-dim);
+}
+
+/* ===== User list ===== */
+.user-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 480px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.user-btn {
+    background: #09090b;
+    color: var(--text-main);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.user-btn:hover {
+    border-color: var(--card-border-hover);
+    background: #18181b;
+}
+.user-btn.active {
+    border-color: var(--accent-blue);
+    background: var(--accent-blue-dim);
+}
+
+.user-info { display: flex; align-items: center; gap: 12px; }
+.user-rank {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 600;
+    width: 20px;
+    text-align: center;
+}
+.name-trend-wrap {
+    display: flex;
+    flex-direction: column;
+    width: 130px;
+    justify-content: center;
+}
+.user-name {
+    font-size: 14px;
+    font-weight: 600;
+    width: 100%;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-main);
+}
+.user-trend { font-size: 12px; text-align: left; margin-top: 4px; }
+.trend-up { color: var(--accent-green); font-weight: 500; }
+.trend-down { color: var(--accent-red); font-weight: 500; }
+.base-up { color: var(--accent-blue); font-size: 11px; margin-left: 4px; font-weight: 600; }
+.base-down { color: var(--accent-orange); font-size: 11px; margin-left: 4px; font-weight: 600; }
+
+.user-points {
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 14px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+/* ===== Charts & tables ===== */
+.chart-container {
+    position: relative;
+    height: 40vh;
+    min-height: 260px;
+    width: 100%;
+    margin-bottom: 24px;
+}
+
+.log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    color: var(--text-main);
+}
+.log-table th,
+.log-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--card-border);
+    text-align: left;
+}
+.log-table th {
+    background: #09090b;
+    color: var(--text-sub);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    font-weight: 500;
+    font-size: 12px;
+}
+.log-table tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+.text-up { color: var(--accent-green); font-weight: 600; }
+.text-down { color: var(--accent-red); font-weight: 600; }
+
+.table-wrap {
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    background: #09090b;
+}
+
+#rawLogToggle {
+    cursor: pointer;
+    color: var(--text-sub);
+    font-size: 13px;
+    margin-top: 16px;
+    display: inline-block;
+    transition: color 0.2s;
+}
+#rawLogToggle:hover { color: var(--text-main); }
+
+#rawLogArea {
+    display: none;
+    width: 100%;
+    height: 200px;
+    margin-top: 12px;
+    color: var(--accent-green);
+    font-family: 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* Range sliders */
+input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    width: 100%;
+}
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    cursor: pointer;
+    background: var(--card-border-hover);
+    border-radius: 2px;
+}
+input[type=range]::-webkit-slider-thumb {
+    border: 2px solid var(--accent-blue);
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    -webkit-appearance: none;
+    margin-top: -6px;
+/* =========================================
+   영역별 직관성을 위한 세련된 포인트 컬러링
+   ========================================= */
+
+/* 1. 유저 리스트 (네비게이션 영역) */
+#box-usergrid {
+    background: #121215;
+    border-top: 3px solid #8b5cf6; /* 보라색: 커뮤니티/리스트 */
+    background-image: linear-gradient(180deg, rgba(139, 92, 246, 0.04) 0%, transparent 60px);
+}
+
+/* 2. 스캔 및 데이터 관리 (액션/작업 영역) */
+#box-ocr {
+    background: #121215;
+    border-top: 3px solid #10b981; /* 녹색: 실행/작업 */
+    background-image: linear-gradient(180deg, rgba(16, 185, 129, 0.04) 0%, transparent 60px);
+}
+#box-data, #box-preset {
+    background: #121215;
+    border-top: 3px solid #3b82f6; /* 파란색: 설정/데이터 */
+    background-image: linear-gradient(180deg, rgba(59, 130, 246, 0.04) 0%, transparent 60px);
+}
+
+/* 3. 메인 대시보드 (데이터 시각화 핵심 영역) */
+#dashboardBox {
+    background: #09090b; /* 가장 깊은 배경색을 써서 차트가 돋보이게 함 */
+    border: 1px solid var(--card-border);
+    border-top: 3px solid #f59e0b; /* 주황색: 메인 핵심 데이터 */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); 
+}
+
+/* 4. 자유 메모 보드 */
+#memoDashboardBox {
+    background: var(--card-bg);
+    border: 1px dashed var(--card-border-hover); 
+    border-top: 3px solid #64748b; /* 슬레이트: 중립적인 보조 패널 */
+}
+
+/* 5. 대기 화면 (비어있을 때) */
+#emptyDashboard {
+    background: repeating-linear-gradient(
+        -45deg,
+        #0f0f12,
+        #0f0f12 10px,
+        #141418 10px,
+        #141418 20px
+    ) !important;
+    border: 1px dashed var(--text-muted);
+}
+
+/* 유저 리스트 선택 시 눈에 더 잘 띄게 개선 */
+.user-btn.active {
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.12), transparent);
+    border-left: 3px solid var(--accent-blue);
+    border-color: rgba(59, 130, 246, 0.4);
+}
+    </style>
+</head>
+<body>
+
+    <!-- 상단 프리폼 헤더 -->
+    <div class="header-container">
+        <div class="header-title-wrap">
+            <h1>활동시간대 v7.2</h1>
+            <p>프리폼 리사이즈 · 배치 편집 · Keep 자동정렬</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <button id="layoutEditToggleBtn" class="btn-orange" onclick="toggleLayoutEditMode()">📐 배치·크기 편집 모드 [OFF]</button>
+            <button class="btn-red" onclick="resetLayoutSettings()" style="padding: 10px 12px; font-size: 12px;">배치 초기화</button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="dateSelector" style="font-size: 13px; color: var(--text-sub); font-weight: 600; white-space: nowrap;">📅 날짜:</label>
+                <select id="dateSelector" onchange="changeDate()"></select>
+            </div>
+        </div>
+    </div>
+
+    <!-- 프리폼 대시보드 구조 -->
+    <div class="container">
+        <!-- 왼쪽 사이드 도구함 패널 -->
+        <div class="panel-column" id="leftPanelColumn">
+            
+            <div class="box" id="box-usergrid">
+                <h2>🛡️ STORMGODS</h2>
+                <div id="userGrid" class="user-grid">
+                    <p style="text-align: center; color: #666; font-size: 12px;">데이터가 없습니다.</p>
+                </div>
+            </div>
+
+            <div class="box" id="box-ocr">
+                <h2>📸 1. ScreenShot OCR</h2>
+                <div style="margin-bottom: 12px; background: rgba(10, 12, 18, 0.6); padding: 12px; border-radius: 8px; border: 1px solid var(--card-border);">
+                    <label style="font-size: 12px; color: var(--text-sub); display: block; margin-bottom: 4px;">오류 필터링 (변동량 무시 기준):</label>
+                    <input type="number" id="errorThreshold" value="1000000" style="width: 100%; padding: 8px; background: rgba(10, 12, 18, 0.9); color: #e5e7eb; border: 1px solid var(--card-border); border-radius: 6px; box-sizing: border-box; font-size: 12px;">
+                    <p style="font-size: 11px; margin-top: 4px; color: #6b7280; margin-bottom: 0;">※ 수치 이상 변동 시 OCR 오류 간주</p>
+                </div>
+                
+                <div class="file-input-group">
+                    <input type="file" id="imgUpload" accept="image/*" multiple>
+                </div>
+                <button id="analyzeBtn" onclick="runBatchAnalysis()" style="width: 100%;">⚡ 대량 분석 시작</button>
+                <div id="loadingText" class="loading">OCR 엔진 구동 중... 끄지 마셈</div>
+            </div>
+            
+            <div class="box" id="box-data">
+                <h2>📁 3. 데이터 관리</h2>
+                <input type="file" id="txtInput" accept=".txt" style="margin-bottom: 10px; width: 100%;" class="file-input-group">
+                <button class="btn-orange" onclick="loadTXT()" style="width: 100%; margin-bottom: 8px;">📂 TXT 데이터 불러오기</button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-green" onclick="downloadTXT()" style="flex: 1;">💾 백업</button>
+                    <button class="btn-red" onclick="clearLogs()" style="flex: 1;">🗑️ 초기화</button>
+                </div>
+                <span id="rawLogToggle" onclick="toggleRaw()">📝 원본 텍스트 로그 보기/숨기기 (수정 가능)</span>
+                <textarea id="rawLogArea"></textarea>
+            </div>
+
+            <div class="box" id="box-preset">
+                <h2>⚙️ 0. 클랜원 이름 프리셋</h2>
+                <p>OCR 감지 오차 보정용 이름 리스트 (유사 스캔 시 자동 매칭)</p>
+                <textarea id="presetNamesArea" style="width: 100%; height: 110px; background: rgba(10, 12, 18, 0.8); color: #e5e7eb; border: 1px solid var(--card-border); border-radius: 8px; padding: 10px; box-sizing: border-box; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="줄바꿈으로 구분하여 클랜원 이름 입력"></textarea>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 6px;">
+                    <label style="font-size: 12px; color: var(--text-sub);">민감도: 
+                        <input type="number" id="presetThreshold" value="50" min="30" max="100" style="width: 48px; background: rgba(10, 12, 18, 0.8); color: #fff; border: 1px solid var(--card-border); padding: 3px 6px; border-radius: 6px; font-size: 12px;">%
+                    </label>
+                    <button class="btn-green" onclick="savePresetNames()" style="padding: 6px 12px; font-size: 12px;">💾 저장</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 오른쪽 프리폼 메인 캔버스 패널 -->
+        <div class="panel-column" id="rightPanelColumn">
+            
+            <!-- 1. 유저 정보 및 차트 대시보드 (선택 시에만 보임) -->
+            <div class="box" id="dashboardBox" style="display: none; height: auto; box-sizing: border-box;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--card-border); padding-bottom: 14px;">
+                    <h2 id="selectedUserName" style="font-size: 1.5rem; margin-bottom: 0; border:none; padding:0;">유저를 선택하세요</h2>
+                    <button id="deleteUserBtn" class="btn-red" style="display: none; padding: 6px 12px; font-size: 12px;" onclick="deleteCurrentUser()">🗑️ 데이터 삭제</button>
+                </div>
+
+                <!-- 그래프 축 조절 패널 -->
+                <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; background: rgba(10, 12, 18, 0.6); padding: 14px; border-radius: 10px; border: 1px solid var(--card-border);">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <label for="yScaleSlider" style="font-size: 12px; color: var(--text-sub); width: 80px;">세로 기울기:</label>
+                        <input type="range" id="yScaleSlider" min="0.1" max="5" step="0.1" value="1" oninput="updateChartScale()" style="flex: 1;">
+                        <span id="scaleValueDisplay" style="font-size: 12px; color: var(--accent-green); font-weight: bold; width: 80px; text-align: right;">보통 (1.0)</span>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <label style="font-size: 12px; color: var(--text-sub); width: 80px;">시간대 구간:</label>
+                        <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
+                            <span style="font-size: 11px; color: #6b7280;">Start</span>
+                            <input type="range" id="xMinSlider" min="0" max="23" step="1" value="0" oninput="updateChartXScale(this.id)" style="flex: 1;">
+                            <span id="xMinDisplay" style="font-size: 12px; color: var(--accent-orange); font-weight: bold; width: 32px; text-align: right;">0시</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
+                            <span style="font-size: 11px; color: #6b7280; margin-left: 6px;">End</span>
+                            <input type="range" id="xMaxSlider" min="1" max="24" step="1" value="24" oninput="updateChartXScale(this.id)" style="flex: 1;">
+                            <span id="xMaxDisplay" style="font-size: 12px; color: var(--accent-orange); font-weight: bold; width: 32px; text-align: right;">24시</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 🔥 메인 그래프 상단 오버레이 컨트롤 바 🔥 -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: rgba(10, 12, 18, 0.7); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--card-border);">
+                    <span style="font-size: 12px; color: var(--accent-green); font-weight: bold;">📌 메인 그래프 오버레이 메모</span>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="overlayToggleBtn" class="btn-orange" style="padding: 5px 12px; font-size: 12px;" onclick="toggleOverlayMode()">✏️ 메모 찍기 모드 [OFF]</button>
+                        <button class="btn-red" style="padding: 5px 12px; font-size: 12px;" onclick="clearCurrentOverlayMemos()">오버레이 전체 삭제</button>
+                    </div>
+                </div>
+
+                <!-- 🔥 메인 차트 및 오버레이 레이어 컨테이너 🔥 -->
+                <div class="chart-container" style="position: relative;">
+                    <canvas id="userChart"></canvas>
+                    <div id="userChartOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 10;"></div>
+                </div>
+
+                <h3>🔻 포인트 하락지점</h3>
+                <div class="chart-container" style="height: 28vh; margin-bottom: 20px;">
+                    <canvas id="decreaseChart"></canvas>
+                </div>
+
+                <h3>⚡ 베이스 변동지점</h3>
+                <div class="chart-container" style="height: 28vh;">
+                    <canvas id="baseDecreaseChart"></canvas>
+                </div>
+
+                <h3>📜 상세 변동 내역</h3>
+                <div class="table-wrap">
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th>time</th>
+                                <th>point</th>
+                                <th>변동량</th>
+                                <th>상태 분석 (베이스 포함)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 3. 상시 유지되는 독립형 메모 보드 -->
+            <div class="box" id="memoDashboardBox">
+                <h2>📌 자유 프리폼 메모 보드 (드래그 교체)</h2>
+                <p>메모 칸의 상단 제목 부분을 마우스로 드래그하면 부드럽게 순서를 변경할 수 있습니다.</p>
+                
+                <div style="background: rgba(10, 12, 18, 0.6); padding: 14px; border: 1px dashed var(--card-border); border-radius: 10px; margin-bottom: 20px;">
+                    <h4 style="margin-top:0; color: var(--text-sub); font-size: 12px; margin-bottom: 8px;">메모 백업/불러오기</h4>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <input type="file" id="memoFileInput" accept=".json" class="file-input-group" style="margin-bottom: 0; padding: 6px; flex: 1;">
+                        <button class="btn-orange" onclick="loadMemoFile()">📂 메모 불러오기</button>
+                        <button class="btn-green" onclick="exportMemos()">💾 메모 전체 백업</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+                    <button class="btn-green" onclick="createDynamicChart('point')">📈 점/선 그래프 추가</button>
+                    <button class="btn-orange" onclick="createDynamicChart('text')">📝 일반 텍스트 메모 추가</button>
+                    <button class="btn-red" style="margin-left: auto;" onclick="clearAllDynamicCharts()">🗑️ 전체 메모 초기화</button>
+                </div>
+
+                <div id="dynamicChartsContainer" style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 2vh; min-height: 50px;">
+                </div>
+            </div>
+
+            <!-- 2. 대기 화면 (유저 미선택 시 보임) -->
+            <div class="box" id="emptyDashboard" style="height: auto; min-height: 200px; display: flex; align-items: center; justify-content: center; color: var(--text-sub); font-size: 14px;">
+                👈 좌측 리스트에서 유저를 선택하면 그래프와 데이터가 나타납니다.
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 스크립트 로직 -->
+    <script>
+        const DEFAULT_PRESETS = [
+            "VISENYA", "SHUSHLEV", "ACE07", "TIGER59", "GREEKDOOM", "PETE72", 
+            "AYKASOU", "LEVIATHAN", "MANNI", "TOM185", "PJ9", "MCN", 
+            "JOSI", "SHARON", "PEPSIJOE", "TZ", "DIPLOMAT", "KINGCAD", 
+            "LINUSVAIN", "THEEVIL", "GATA", "WERNER1948", "VOLTS", "SAEDAELAER", 
+            "MAZA2288", "MATIS", "RACH", "SAAID", "LIOGSTELL8", "D0CMA", 
+            "XOXO", "TOA", "SHUNTIFUMI", "REDVIPER", "GUNNAR7", "KOILEE", 
+            "PAPAS", "BROCK8", "TUANLN", "MESSANGER", "K15", "HELLASGOD", 
+            "DUNG9", "DOCTRINE", "VICCOS06", "VALHALL", "TOMMY", "VIIPER", 
+            "W0LF", "SCRAPPYC"
+        ];
+
+        let memoryLogs = ""; 
+        let rawParsedData = []; 
+        let parsedData = {};    
+        let masterUserList = new Set();
+        let availableDates = new Set();
+        let currentDateFilter = '';
+        let myChart = null;
+        let myDecreaseChart = null; 
+        let myBaseDecreaseChart = null; 
+        
+        let currentSelectedUser = '';
+        let currentUserHistory = [];
+        let dynamicCharts = []; 
+        let globalXMin = 0;
+        let globalXMax = 24;
+        let isOverlayMode = false;
+        let overlayMemos = {}; 
+        let isLayoutEditMode = false;
+
+        window.onload = function() {
+            loadMemoryLogs(); 
+            initPresetNames();
+            loadOverlayMemos();
+            refreshDashboard();
+            
+            // 기존 위젯 위치 불러오기 및 Sortable(애니메이션 자동정렬) 세팅
+            loadLayoutSettings();
+            initSortableLayout();
+            
+            initDynamicCharts(); 
+            initMemoSortable(); // 메모장용 Sortable 세팅
+            
+            initOverlayEventListener();
+            initRawLogListener();
+            window.addEventListener('resize', renderOverlayMemos);
+        };
+
+        function safeGetStorage(key, defaultValue = "") {
+            try { return localStorage.getItem(key) || defaultValue; } catch (e) { return defaultValue; }
+        }
+        function safeSetStorage(key, value) {
+            try { localStorage.setItem(key, value); } catch (e) { console.warn("Storage write blocked", e); }
+        }
+
+        // Keep 스타일 레이아웃 드래그 앤 드롭 초기화 (자동 저장 포함)
+        function initSortableLayout() {
+            const leftPanel = document.getElementById('leftPanelColumn');
+            const rightPanel = document.getElementById('rightPanelColumn');
+
+            const options = {
+                group: 'dashboard-layout', // 좌우 패널간 상자 이동 허용
+                animation: 250,            // 스르륵 위치가 바뀌는 Keep 스타일 애니메이션
+                easing: "cubic-bezier(1, 0, 0, 1)",
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                disabled: true, // 평소엔 잠궈두고 편집 모드에서만 풀림
+                onEnd: function () {
+                    // 순서를 바꿀 때마다 알아서 자동 저장
+                    saveLayoutSettings();
+                }
+            };
+
+            window.leftSortable = Sortable.create(leftPanel, options);
+            window.rightSortable = Sortable.create(rightPanel, options);
+        }
+
+        // 메모 보드용 Keep 스타일 드래그 초기화
+        function initMemoSortable() {
+            const container = document.getElementById('dynamicChartsContainer');
+            Sortable.create(container, {
+                animation: 250,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                handle: '.memo-drag-handle', // 제목 표시줄을 잡아야만 끌리게 설정
+                onEnd: function () {
+                    // 메모장 순서 바뀌면 자동 저장
+                    reorderDynamicChartsArray(); 
+                }
+            });
+        }
+
+        function toggleLayoutEditMode() {
+            isLayoutEditMode = !isLayoutEditMode;
+            const btn = document.getElementById('layoutEditToggleBtn');
+            const body = document.body;
+
+            if (isLayoutEditMode) {
+                btn.innerText = '📐 배치·크기 편집 모드 [ON] - 자유롭게 드래그해봐';
+                btn.style.background = '#10B981';
+                body.classList.add('edit-mode-active');
+                
+                // 편집 모드 켜질 때 Sortable 활성화
+                if(window.leftSortable) window.leftSortable.option("disabled", false);
+                if(window.rightSortable) window.rightSortable.option("disabled", false);
+            } else {
+                btn.innerText = '📐 배치·크기 편집 모드 [OFF]';
+                btn.style.background = '#F59E0B';
+                body.classList.remove('edit-mode-active');
+                
+                // 편집 모드 꺼질 때 Sortable 비활성화
+                if(window.leftSortable) window.leftSortable.option("disabled", true);
+                if(window.rightSortable) window.rightSortable.option("disabled", true);
+                
+                saveLayoutSettings(); // 안전빵으로 한번 더 저장
+            }
+        }
+
+        function saveLayoutSettings() {
+            const leftIds = [...document.querySelectorAll('#leftPanelColumn > .box')].map(b => b.id);
+            const rightIds = [...document.querySelectorAll('#rightPanelColumn > .box')].map(b => b.id);
+            
+            const boxStyles = {};
+            document.querySelectorAll('.box').forEach(b => {
+                boxStyles[b.id] = { width: b.style.width, height: b.style.height };
+            });
+
+            const layoutData = { leftIds, rightIds, boxStyles };
+            safeSetStorage('clanLayoutSettings', JSON.stringify(layoutData));
+        }
+
+        function loadLayoutSettings() {
+            const saved = safeGetStorage('clanLayoutSettings', '');
+            if (!saved) return;
+            try {
+                const data = JSON.parse(saved);
+                const leftPanel = document.getElementById('leftPanelColumn');
+                const rightPanel = document.getElementById('rightPanelColumn');
+
+                if (data.leftIds) {
+                    data.leftIds.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) leftPanel.appendChild(el);
+                    });
+                }
+                if (data.rightIds) {
+                    data.rightIds.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) rightPanel.appendChild(el);
+                    });
+                }
+                if (data.boxStyles) {
+                    Object.keys(data.boxStyles).forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el && data.boxStyles[id]) {
+                            if (data.boxStyles[id].width) el.style.width = data.boxStyles[id].width;
+                            if (data.boxStyles[id].height) el.style.height = data.boxStyles[id].height;
+                        }
+                    });
+                }
+            } catch(e) {
+                console.warn("Layout load failed", e);
+            }
+        }
+
+        function resetLayoutSettings() {
+            if (confirm("위젯 배치와 크기를 초기 상태로 돌릴까?")) {
+                localStorage.removeItem('clanLayoutSettings');
+                location.reload();
+            }
+        }
+
+        function saveMemoryLogs() { safeSetStorage('clanMemoryLogs', memoryLogs); }
+        function loadMemoryLogs() { memoryLogs = safeGetStorage('clanMemoryLogs', ""); }
+
+        function initRawLogListener() {
+            const area = document.getElementById('rawLogArea');
+            area.addEventListener('input', function() {
+                memoryLogs = this.value;
+                saveMemoryLogs();
+                refreshDashboard();
+            });
+        }
+
+        function loadOverlayMemos() {
+            const saved = safeGetStorage('clanOverlayMemos', '');
+            if (saved) { try { overlayMemos = JSON.parse(saved); } catch (e) { overlayMemos = {}; } }
+        }
+        function saveOverlayMemos() { safeSetStorage('clanOverlayMemos', JSON.stringify(overlayMemos)); }
+
+        function toggleOverlayMode() {
+            isOverlayMode = !isOverlayMode;
+            const btn = document.getElementById('overlayToggleBtn');
+            const overlayLayer = document.getElementById('userChartOverlay');
+
+            if (isOverlayMode) {
+                btn.innerText = '✏️ 메모 찍기 모드 [ON] - 클릭하여 점/메모 추가';
+                btn.style.background = '#10B981';
+                overlayLayer.style.pointerEvents = 'auto';
+                overlayLayer.style.cursor = 'crosshair';
+            } else {
+                btn.innerText = '✏️ 메모 찍기 모드 [OFF]';
+                btn.style.background = '#F59E0B';
+                overlayLayer.style.pointerEvents = 'none';
+                overlayLayer.style.cursor = 'default';
+            }
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function renderOverlayMemos() {
+            const container = document.getElementById('userChartOverlay');
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (!currentDateFilter || !currentSelectedUser) return;
+            const key = `${currentDateFilter}_${currentSelectedUser}`;
+            const list = overlayMemos[key] || [];
+
+            list.forEach(item => {
+                const pin = document.createElement('div');
+                pin.className = 'overlay-pin-item';
+                pin.style.position = 'absolute';
+
+                if (myChart && myChart.scales && myChart.scales.x && myChart.scales.y && item.xVal !== undefined && item.xVal !== null) {
+                    const xPx = myChart.scales.x.getPixelForValue(item.xVal);
+                    const yPx = myChart.scales.y.getPixelForValue(item.yVal);
+                    pin.style.left = xPx + 'px';
+                    pin.style.top = yPx + 'px';
+                } else {
+                    pin.style.left = item.xPct + '%';
+                    pin.style.top = item.yPct + '%';
+                }
+
+                pin.style.transform = 'translate(-6px, -6px)';
+                pin.style.zIndex = '20';
+                pin.style.pointerEvents = 'auto';
+                pin.style.display = 'flex';
+                pin.style.alignItems = 'center';
+                pin.style.gap = '6px';
+
+                pin.innerHTML = `
+                    <div style="width: 12px; height: 12px; background: #EF4444; border: 2px solid #FFF; border-radius: 50%; box-shadow: 0 0 10px rgba(239, 68, 68, 0.9); cursor: pointer;" title="클릭해서 삭제" onclick="deleteOverlayPin('${item.id}', event)"></div>
+                    <div style="background: rgba(24, 26, 32, 0.92); border: 1px solid #3B82F6; color: #FFF; padding: 3px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 6px;">
+                        <span>${escapeHtml(item.text)}</span>
+                        <span style="color:#EF4444; cursor:pointer; font-weight:bold; font-size:11px;" onclick="deleteOverlayPin('${item.id}', event)">✖</span>
+                    </div>
+                `;
+                container.appendChild(pin);
+            });
+        }
+
+        function initOverlayEventListener() {
+            const overlayLayer = document.getElementById('userChartOverlay');
+            if (!overlayLayer) return;
+
+            overlayLayer.addEventListener('click', function(e) {
+                if (!isOverlayMode) return;
+                if (e.target.closest('.overlay-pin-item')) return;
+                if (!currentDateFilter || !currentSelectedUser) return alert("유저와 날짜를 먼저 선택해줘.");
+
+                const rect = overlayLayer.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                const xPct = (mouseX / rect.width) * 100;
+                const yPct = (mouseY / rect.height) * 100;
+
+                let xVal = null, yVal = null;
+                if (myChart && myChart.scales && myChart.scales.x && myChart.scales.y) {
+                    xVal = myChart.scales.x.getValueForPixel(mouseX);
+                    yVal = myChart.scales.y.getValueForPixel(mouseY);
+                }
+
+                const text = prompt("이 지점에 찍을 메모를 입력해:", "");
+                if (text === null || text.trim() === "") return;
+
+                const key = `${currentDateFilter}_${currentSelectedUser}`;
+                if (!overlayMemos[key]) overlayMemos[key] = [];
+
+                overlayMemos[key].push({
+                    id: 'pin_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                    xPct: xPct.toFixed(2), yPct: yPct.toFixed(2), xVal: xVal, yVal: yVal, text: text.trim()
+                });
+
+                saveOverlayMemos();
+                renderOverlayMemos();
+            });
+        }
+
+        function deleteOverlayPin(pinId, e) {
+            if(e) e.stopPropagation();
+            if (!confirm("이 오버레이 메모를 삭제할까?")) return;
+            const key = `${currentDateFilter}_${currentSelectedUser}`;
+            if (overlayMemos[key]) {
+                overlayMemos[key] = overlayMemos[key].filter(p => p.id !== pinId);
+                saveOverlayMemos();
+                renderOverlayMemos();
+            }
+        }
+
+        function clearCurrentOverlayMemos() {
+            if (!currentDateFilter || !currentSelectedUser) return;
+            const key = `${currentDateFilter}_${currentSelectedUser}`;
+            if (!overlayMemos[key] || overlayMemos[key].length === 0) return alert("삭제할 오버레이 메모가 없어.");
+            if (confirm(`'${currentSelectedUser}' 유저의 메인 그래프 오버레이 메모를 전체 삭제할까?`)) {
+                delete overlayMemos[key];
+                saveOverlayMemos();
+                renderOverlayMemos();
+            }
+        }
+
+        function initPresetNames() {
+            const savedPresets = safeGetStorage('clanPresetNames', null);
+            const area = document.getElementById('presetNamesArea');
+            if (savedPresets !== null) {
+                area.value = savedPresets;
+            } else {
+                area.value = DEFAULT_PRESETS.join('\n');
+                savePresetNames();
+            }
+        }
+
+        function savePresetNames() {
+            const area = document.getElementById('presetNamesArea');
+            safeSetStorage('clanPresetNames', area.value);
+            alert("이름 프리셋 목록이 저장되었어.");
+        }
+
+        function getPresetList() {
+            const text = document.getElementById('presetNamesArea').value || '';
+            return text.split('\n').map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+        }
+
+        function levenshteinDistance(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
+                    else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function findBestMatch(scannedName, presetList, minSimilarity = 0.5) {
+            if (!presetList || presetList.length === 0) return scannedName;
+
+            const cleanScanned = scannedName.toUpperCase().trim();
+            let bestMatch = scannedName;
+            let highestSim = 0;
+
+            for (let preset of presetList) {
+                const cleanPreset = preset.toUpperCase().trim();
+                if (!cleanPreset) continue;
+                if (cleanScanned === cleanPreset) return cleanPreset;
+
+                const dist = levenshteinDistance(cleanScanned, cleanPreset);
+                const maxLen = Math.max(cleanScanned.length, cleanPreset.length);
+                const similarity = 1 - (dist / maxLen);
+
+                if (similarity > highestSim) { highestSim = similarity; bestMatch = cleanPreset; }
+            }
+            return highestSim >= minSimilarity ? bestMatch : scannedName;
+        }
+
+        function toggleRaw() {
+            const area = document.getElementById('rawLogArea');
+            area.style.display = area.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function initDynamicCharts() {
+            const savedRaw = safeGetStorage('clanDynamicCharts', '[]');
+            let saved = [];
+            try { saved = JSON.parse(savedRaw); } catch(e) { saved = []; }
+            dynamicCharts = [];
+            document.getElementById('dynamicChartsContainer').innerHTML = '';
+            saved.forEach(c => createDynamicChart(c.type, c.id, c.data, false));
+        }
+        
+        function saveDynamicCharts() {
+            const toSave = dynamicCharts.map(dc => ({ id: dc.id, type: dc.type, data: dc.data }));
+            safeSetStorage('clanDynamicCharts', JSON.stringify(toSave));
+        }
+
+        function exportMemos() {
+            if (dynamicCharts.length === 0) return alert("추출할 메모가 하나도 없어.");
+            const dataToExport = dynamicCharts.map(dc => ({ type: dc.type, data: dc.data }));
+            const dataStr = JSON.stringify(dataToExport, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "메모_백업데이터.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function loadMemoFile() {
+            const fileInput = document.getElementById('memoFileInput');
+            const file = fileInput.files[0];
+            if (!file) return alert("먼저 불러올 메모 파일(.json)을 선택해.");
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const loadedData = JSON.parse(e.target.result);
+                    if (!Array.isArray(loadedData)) throw new Error("배열 형태가 아님");
+                    
+                    let loadedCount = 0;
+                    loadedData.forEach(item => {
+                        if (item.type === 'point' || item.type === 'text') {
+                            const newId = 'chart_loaded_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+                            createDynamicChart(item.type, newId, item.data, true);
+                            loadedCount++;
+                        }
+                    });
+                    
+                    alert(`성공적으로 ${loadedCount}개의 메모를 추가로 불러왔어.`);
+                    fileInput.value = "";
+                } catch (err) {
+                    alert("파일을 읽는 중 오류가 났어. 정상적인 추출 파일(.json)인지 확인해봐.");
+                }
+            };
+            reader.readAsText(file, "UTF-8");
+        }
+
+        function reorderDynamicChartsArray() {
+            const wrappers = document.querySelectorAll('#dynamicChartsContainer > div');
+            const newOrder = [];
+            wrappers.forEach(w => {
+                const id = w.id.replace('wrapper_', '');
+                const chartObj = dynamicCharts.find(c => c.id === id);
+                if (chartObj) newOrder.push(chartObj);
+            });
+            dynamicCharts = newOrder;
+            saveDynamicCharts();
+        }
+
+        function createDynamicChart(type, existingId = null, existingData = null, shouldSave = true) {
+            const id = existingId || 'chart_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+            
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'relative';
+            wrapper.style.padding = '15px';
+            wrapper.style.background = 'rgba(10, 12, 18, 0.7)';
+            wrapper.style.border = type === 'point' ? '1px dashed #3B82F6' : '1px dashed #F59E0B';
+            wrapper.style.borderRadius = '12px';
+            wrapper.id = 'wrapper_' + id;
+
+            const header = document.createElement('div');
+            header.className = 'memo-drag-handle'; // SortableJS 핸들 클래스 지정
+            header.style.display = 'flex';
+            header.style.justifyContent = 'space-between';
+            header.style.alignItems = 'center';
+            header.style.marginBottom = '12px';
+            header.style.cursor = 'grab';
+            
+            const titleHtml = type === 'point' 
+                ? '<span style="color:#10B981; font-weight:bold;">📈 그래프 메모장 (이곳을 잡아 끌어 순서 변경)</span>' 
+                : '<span style="color:#F59E0B; font-weight:bold;">📝 일반 텍스트 메모장 (이곳을 잡아 끌어 순서 변경)</span>';
+                
+            header.innerHTML = `
+                <div style="font-size:13px; pointer-events:none;">${titleHtml}</div>
+                <button style="background:#EF4444; color:white; border:none; border-radius:6px; padding:4px 10px; font-size:11px; cursor:pointer;" onclick="removeDynamicChart('${id}')">삭제 ✖</button>
+            `;
+            wrapper.appendChild(header);
+
+            if (type === 'point') {
+                const canvasContainer = document.createElement('div');
+                canvasContainer.className = 'chart-container';
+                canvasContainer.style.height = '28vh';
+                canvasContainer.style.marginBottom = '0';
+                
+                const canvas = document.createElement('canvas');
+                canvas.id = 'canvas_' + id;
+                canvasContainer.appendChild(canvas);
+                wrapper.appendChild(canvasContainer);
+                document.getElementById('dynamicChartsContainer').appendChild(wrapper);
+                
+                const ctx = canvas.getContext('2d');
+                const chartData = Array.isArray(existingData) ? [...existingData] : [];
+                
+                const newChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: '점/선 데이터',
+                            data: chartData,
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            pointBackgroundColor: '#3B82F6',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            showLine: true, 
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        onClick: (e, activeElements) => {
+                            if (activeElements.length > 0) {
+                                const index = activeElements[0].index;
+                                if (confirm('이 포인트를 삭제할까?')) {
+                                    chartData.splice(index, 1);
+                                    newChart.update();
+                                    const targetObj = dynamicCharts.find(c => c.id === id);
+                                    if (targetObj) targetObj.data = chartData;
+                                    saveDynamicCharts();
+                                }
+                                return;
+                            }
+                            const xValue = newChart.scales.x.getValueForPixel(e.native.offsetX);
+                            const yValue = newChart.scales.y.getValueForPixel(e.native.offsetY);
+                            
+                            if (xValue < 0 || xValue > 24) return;
+                            chartData.push({ x: xValue, y: yValue });
+                            chartData.sort((a, b) => a.x - b.x);
+                            newChart.update();
+
+                            const targetObj = dynamicCharts.find(c => c.id === id);
+                            if (targetObj) targetObj.data = chartData;
+                            saveDynamicCharts();
+                        },
+                        scales: {
+                            x: {
+                                type: 'linear', min: globalXMin, max: globalXMax,
+                                ticks: {
+                                    stepSize: 2,
+                                    callback: function(value) {
+                                        if (value === 0 || value === 24) return '자정';
+                                        if (value === 12) return '정오';
+                                        return value < 12 ? `오전 ${value}시` : `오후 ${value - 12}시`;
+                                    },
+                                    color: '#9ca3af'
+                                },
+                                grid: { color: 'rgba(255,255,255,0.05)' }
+                            },
+                            y: {
+                                type: 'linear', display: true, position: 'left',
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                ticks: { color: '#F59E0B' },
+                                suggestedMin: 0, suggestedMax: 100
+                            }
+                        },
+                        plugins: { legend: { labels: { color: '#d1d5db' } } }
+                    }
+                });
+                
+                dynamicCharts.push({ id, type, chartInstance: newChart, data: chartData });
+
+            } else if (type === 'text') {
+                const textarea = document.createElement('textarea');
+                textarea.style.width = '100%';
+                textarea.style.height = '140px';
+                textarea.style.background = 'rgba(10, 12, 18, 0.8)';
+                textarea.style.color = '#f3f4f6';
+                textarea.style.border = '1px solid var(--card-border)';
+                textarea.style.borderRadius = '8px';
+                textarea.style.padding = '12px';
+                textarea.style.boxSizing = 'border-box';
+                textarea.style.resize = 'vertical';
+                textarea.style.fontSize = '13px';
+                textarea.style.fontFamily = 'inherit';
+                textarea.placeholder = "여기에 메모를 자유롭게 남기세요...";
+                textarea.value = existingData || '';
+                
+                const statusDiv = document.createElement('div');
+                statusDiv.style.fontSize = '11px';
+                statusDiv.style.color = '#10B981';
+                statusDiv.style.marginTop = '4px';
+                statusDiv.style.textAlign = 'right';
+                statusDiv.style.minHeight = '16px';
+                statusDiv.innerText = '';
+                
+                let saveTimeout;
+                textarea.addEventListener('input', () => {
+                    statusDiv.innerText = '저장 중...';
+                    statusDiv.style.color = '#F59E0B'; 
+                    
+                    clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(() => {
+                        const idx = dynamicCharts.findIndex(c => c.id === id);
+                        if (idx > -1) {
+                            dynamicCharts[idx].data = textarea.value;
+                            saveDynamicCharts();
+                            statusDiv.innerText = '✓ 로컬 스토리지에 저장됨';
+                            statusDiv.style.color = '#10B981'; 
+                            setTimeout(() => { statusDiv.innerText = ''; }, 2000);
+                        }
+                    }, 500); 
+                });
+
+                wrapper.appendChild(textarea);
+                wrapper.appendChild(statusDiv);
+                document.getElementById('dynamicChartsContainer').appendChild(wrapper);
+
+                dynamicCharts.push({ id, type, chartInstance: null, data: textarea.value });
+            }
+            
+            if(shouldSave) saveDynamicCharts();
+        }
+
+        function removeDynamicChart(id) {
+            if(confirm('이 메모 칸을 아예 삭제할까?')) {
+                const idx = dynamicCharts.findIndex(c => c.id === id);
+                if (idx > -1) {
+                    if (dynamicCharts[idx].chartInstance) dynamicCharts[idx].chartInstance.destroy();
+                    dynamicCharts.splice(idx, 1);
+                }
+                const wrapper = document.getElementById('wrapper_' + id);
+                if (wrapper) wrapper.remove();
+                saveDynamicCharts();
+            }
+        }
+        
+        function clearAllDynamicCharts() {
+            if(confirm('추가해둔 모든 메모 칸을 싹 지울까? (복구 불가)')) {
+                dynamicCharts.forEach(c => { if (c.chartInstance) c.chartInstance.destroy(); });
+                dynamicCharts = [];
+                document.getElementById('dynamicChartsContainer').innerHTML = '';
+                try { localStorage.removeItem('clanDynamicCharts'); } catch(e){}
+            }
+        }
+
+        function parseLogsToData() {
+            const rawLogs = memoryLogs; 
+            document.getElementById('rawLogArea').value = rawLogs;
+            
+            let savedUsers = [];
+            try { savedUsers = JSON.parse(safeGetStorage('clanMasterUsers', "[]")); } catch(e){}
+            masterUserList = new Set(savedUsers);
+
+            const lines = rawLogs.split('\n');
+            let logsList = [];
+            let seenKeys = new Set();
+            
+            let currentDate = "과거 데이터 (날짜 미상)";
+            let currentTargetTime = "00:00:00";
+            availableDates.clear();
+
+            const dateRegex = /\[날짜:\s*([^\]]+)\]/;
+            const timeRegex = /비교 구간: .* -> ([\d:]+)/;
+            const userRegexV3 = /- User:\s+([a-zA-Z0-9_\-\.]+)\s+\|\s+Point:\s+\d+\s+->\s+(\d+)\s+\(변동:\s+([+-]?\d+)\)\s+\|\s+Base:\s+\d+\s+->\s+(\d+)\s+\(변동:\s+([+-]?\d+|NaN)\)\s+\|\s+상태:\s+(.*)/;
+            const userRegexV2 = /- User:\s+([a-zA-Z0-9_\-\.]+)\s+\|\s+Point:\s+\d+\s+->\s+(\d+)\s+\(변동:\s+([+-]?\d+)\)\s+\|\s+Base:\s+([+-]?\d+|NaN)\s+\|\s+상태:\s+(.*)/;
+            const userRegexV1 = /- User:\s+([a-zA-Z0-9_\-\.]+)\s+\|\s+Point:\s+\d+\s+->\s+(\d+)\s+\(변동:\s+([+-]?\d+)\)\s+\|\s+상태:\s+(.*)/;
+
+            for(let line of lines) {
+                let isHeaderLine = false;
+
+                const dMatch = line.match(dateRegex);
+                if(dMatch) { currentDate = dMatch[1]; availableDates.add(currentDate); isHeaderLine = true; }
+
+                const tMatch = line.match(timeRegex);
+                if(tMatch) { currentTargetTime = tMatch[1]; isHeaderLine = true; }
+
+                if(isHeaderLine) continue;
+
+                const matchV3 = line.match(userRegexV3);
+                const matchV2 = line.match(userRegexV2);
+                const matchV1 = line.match(userRegexV1);
+
+                if (matchV3 || matchV2 || matchV1) {
+                    let uName, uPoint, uDiff, uBaseAbs = 0, bDiff = 0, uStatus;
+
+                    if (matchV3) {
+                        uName = matchV3[1].trim().toUpperCase(); uPoint = parseInt(matchV3[2], 10); uDiff = parseInt(matchV3[3], 10);
+                        uBaseAbs = parseInt(matchV3[4], 10); bDiff = parseInt(matchV3[5], 10) || 0; uStatus = matchV3[6].trim();
+                    } else if (matchV2) {
+                        uName = matchV2[1].trim().toUpperCase(); uPoint = parseInt(matchV2[2], 10); uDiff = parseInt(matchV2[3], 10);
+                        bDiff = parseInt(matchV2[4], 10) || 0; uStatus = matchV2[5].trim();
+                    } else {
+                        uName = matchV1[1].trim().toUpperCase(); uPoint = parseInt(matchV1[2], 10); uDiff = parseInt(matchV1[3], 10); uStatus = matchV1[4].trim();
+                    }
+
+                    masterUserList.add(uName);
+
+                    const uniqueKey = `${currentDate}_${currentTargetTime}_${uName}_${uPoint}_${uDiff}_${bDiff}`;
+                    if (!seenKeys.has(uniqueKey)) {
+                        seenKeys.add(uniqueKey);
+                        logsList.push({ date: currentDate, time: currentTargetTime, name: uName, point: uPoint, diff: uDiff, baseAbs: uBaseAbs, baseDiff: bDiff, status: uStatus });
+                    }
+                }
+            }
+            
+            safeSetStorage('clanMasterUsers', JSON.stringify(Array.from(masterUserList)));
+            return logsList;
+        }
+
+        function updateDateSelector() {
+            const sel = document.getElementById('dateSelector');
+            sel.innerHTML = '';
+            
+            const sortedDates = Array.from(availableDates).filter(d => d !== "과거 데이터 (날짜 미상)").sort().reverse();
+            if (availableDates.has("과거 데이터 (날짜 미상)")) sortedDates.push("과거 데이터 (날짜 미상)");
+
+            if (sortedDates.length === 0) {
+                sel.innerHTML = '<option value="">날짜 데이터 없음</option>';
+                currentDateFilter = '';
+                return;
+            }
+
+            sortedDates.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d; opt.innerText = d; sel.appendChild(opt);
+            });
+
+            if (!currentDateFilter || !availableDates.has(currentDateFilter)) currentDateFilter = sortedDates[0]; 
+            sel.value = currentDateFilter;
+        }
+
+        function getFilteredData() {
+            const data = {};
+            rawParsedData.forEach(log => {
+                if (log.date === currentDateFilter) {
+                    if (!data[log.name]) data[log.name] = [];
+                    data[log.name].push(log);
+                }
+            });
+            return data;
+        }
+
+        function refreshDashboard() {
+            rawParsedData = parseLogsToData();
+            updateDateSelector();
+            parsedData = getFilteredData();
+            renderUserGrid();
+        }
+
+        function changeDate() {
+            currentDateFilter = document.getElementById('dateSelector').value;
+            parsedData = getFilteredData();
+            renderUserGrid(); 
+
+            if (currentSelectedUser) selectUser(currentSelectedUser);
+            else { document.getElementById('emptyDashboard').style.display = 'flex'; document.getElementById('dashboardBox').style.display = 'none'; }
+        }
+
+        function renderUserGrid() {
+            const grid = document.getElementById('userGrid');
+            grid.innerHTML = "";
+
+            const latestPoints = {};
+            const latestBases = {}; 
+            rawParsedData.forEach(log => {
+                if (log.date === currentDateFilter) {
+                    latestPoints[log.name] = log.point;
+                    if (log.baseAbs) latestBases[log.name] = log.baseAbs; 
+                }
+            });
+
+            const allUsersList = Array.from(masterUserList);
+            if(allUsersList.length === 0) return grid.innerHTML = '<p style="text-align: center; color: #6b7280; font-size: 12px;">데이터가 없습니다.</p>';
+
+            allUsersList.sort((a, b) => (latestPoints[b] || 0) - (latestPoints[a] || 0));
+
+            allUsersList.forEach((name, index) => {
+                const history = parsedData[name] || [];
+                const totalDiff = history.reduce((sum, h) => sum + h.diff, 0);
+                const totalBaseDiff = history.reduce((sum, h) => sum + (h.baseDiff || 0), 0);
+                const currentPoint = latestPoints[name];
+                const currentBase = latestBases[name];
+                
+                const btn = document.createElement('div');
+                btn.className = 'user-btn';
+                btn.id = 'btn-' + name;
+                
+                let trendHtml = totalDiff > 0 ? `<span class="trend-up">▲ +${totalDiff}</span>` : (totalDiff < 0 ? `<span class="trend-down">▼ ${Math.abs(totalDiff)}</span>` : `<span style="color:#4b5563;">-</span>`);
+                let baseHtml = totalBaseDiff > 0 ? `<span class="base-up">(B:+${totalBaseDiff})</span>` : (totalBaseDiff < 0 ? `<span class="base-down">(B:${totalBaseDiff})</span>` : '');
+
+                const pointStr = currentPoint !== undefined ? currentPoint.toLocaleString() : "기록없음";
+                const baseStr = currentBase !== undefined && currentBase !== 0 ? `Base: ${currentBase.toLocaleString()}` : "Base 미측정";
+
+                btn.innerHTML = `
+                    <div class="user-info">
+                        <span class="user-rank">${index + 1}</span>
+                        <div class="name-trend-wrap">
+                            <span class="user-name">${name}</span>
+                            <span class="user-trend">${trendHtml} ${baseHtml}</span>
+                        </div>
+                    </div>
+                    <div class="user-points" style="display:flex; flex-direction:column; align-items:flex-end;">
+                        <span>${pointStr}</span>
+                        <span style="font-size:11px; color:#9ca3af; margin-top:2px;">${baseStr}</span>
+                    </div>
+                `;
+                btn.onclick = () => selectUser(name);
+                grid.appendChild(btn);
+            });
+        }
+
+        function selectUser(name) {
+            document.querySelectorAll('.user-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById('btn-' + name);
+            if(activeBtn) activeBtn.classList.add('active');
+
+            document.getElementById('emptyDashboard').style.display = 'none';
+            document.getElementById('dashboardBox').style.display = 'block';
+            document.getElementById('deleteUserBtn').style.display = 'block'; 
+
+            const dateText = currentDateFilter ? `<span style="font-size:14px; color:#9ca3af; font-weight:normal;">(${currentDateFilter})</span>` : '';
+            document.getElementById('selectedUserName').innerHTML = `<span style="background: linear-gradient(90deg, #d1d5db, #e5e7eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${name}</span> ${dateText}`;
+
+            const history = parsedData[name] || [];
+            currentSelectedUser = name;
+            currentUserHistory = history;
+
+            drawChart(name, history);
+            drawDecreaseChart(history); 
+            drawBaseDecreaseChart(history); 
+            renderLogTable(history);
+            renderOverlayMemos(); 
+        }
+
+        function updateChartScale() {
+            const sliderVal = parseFloat(document.getElementById('yScaleSlider').value);
+            const display = document.getElementById('scaleValueDisplay');
+            
+            if (sliderVal < 0.5) display.innerText = '가파름 (' + sliderVal + ')';
+            else if (sliderVal > 2.5) display.innerText = '완만함 (' + sliderVal + ')';
+            else display.innerText = '보통 (' + sliderVal + ')';
+            
+            if (currentSelectedUser) {
+                drawChart(currentSelectedUser, currentUserHistory);
+                drawDecreaseChart(currentUserHistory);
+                drawBaseDecreaseChart(currentUserHistory); 
+            }
+        }
+
+        function updateChartXScale(sourceId) {
+            let minVal = parseInt(document.getElementById('xMinSlider').value, 10);
+            let maxVal = parseInt(document.getElementById('xMaxSlider').value, 10);
+
+            if (minVal >= maxVal) {
+                if (sourceId === 'xMinSlider') { maxVal = minVal + 1; document.getElementById('xMaxSlider').value = maxVal; } 
+                else if (sourceId === 'xMaxSlider') { minVal = maxVal - 1; document.getElementById('xMinSlider').value = minVal; }
+            }
+
+            globalXMin = minVal; globalXMax = maxVal;
+            document.getElementById('xMinDisplay').innerText = minVal + '시';
+            document.getElementById('xMaxDisplay').innerText = maxVal + '시';
+
+            [myChart, myDecreaseChart, myBaseDecreaseChart].forEach(chart => {
+                if (chart) { chart.options.scales.x.min = globalXMin; chart.options.scales.x.max = globalXMax; chart.update(); }
+            });
+            
+            dynamicCharts.forEach(dc => {
+                if(dc.chartInstance) { dc.chartInstance.options.scales.x.min = globalXMin; dc.chartInstance.options.scales.x.max = globalXMax; dc.chartInstance.update(); }
+            });
+            renderOverlayMemos();
+        }
+
+        function timeToDecimal(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.split(':');
+            return (parseInt(parts[0], 10) || 0) + (parseInt(parts[1], 10) || 0) / 60 + (parseInt(parts[2], 10) || 0) / 3600;
+        }
+
+        function drawChart(name, history) {
+            const ctx = document.getElementById('userChart').getContext('2d');
+            if(myChart) myChart.destroy();
+
+            const sortedHistory = [...history].sort((a, b) => timeToDecimal(a.time) - timeToDecimal(b.time));
+            const processedPoints = [], processedDiffs = [];
+
+            for (let i = 0; i < sortedHistory.length; i++) {
+                const h = sortedHistory[i];
+                const currDecimal = timeToDecimal(h.time);
+                
+                if (i > 0) {
+                    const prevDecimal = timeToDecimal(sortedHistory[i-1].time);
+                    if (currDecimal - prevDecimal > 0.085) {
+                        processedPoints.push({ x: prevDecimal + 0.001, y: null, rawTime: null });
+                        processedDiffs.push({ x: prevDecimal + 0.001, y: null, rawTime: null });
+                    }
+                }
+                
+                processedPoints.push({ x: currDecimal, y: h.point, rawTime: h.time });
+                processedDiffs.push({ x: currDecimal, y: h.diff, rawTime: h.time });
+            }
+
+            const pValues = sortedHistory.map(h => h.point);
+            const dValues = sortedHistory.map(h => h.diff);
+
+            const pMin = pValues.length ? Math.min(...pValues) : 0;
+            const pMax = pValues.length ? Math.max(...pValues) : 100;
+            let pGap = pMax - pMin || 100; 
+
+            const dMin = dValues.length ? Math.min(...dValues) : -10;
+            const dMax = dValues.length ? Math.max(...dValues) : 10;
+            let dGap = dMax - dMin || 20;
+
+            const sliderInput = document.getElementById('yScaleSlider');
+            const scaleMultiplier = sliderInput ? parseFloat(sliderInput.value) : 1.0;
+            let pPadding = pGap * scaleMultiplier || 10; 
+
+            const yMinAdjusted = Math.max(0, pMin - pPadding);
+            const yMaxAdjusted = pMax + pPadding;
+            const y1MinAdjusted = dMin - dGap * 0.1;
+            const y1MaxAdjusted = dMax + dGap * 3.5; 
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        { label: '포인트', data: processedPoints, borderColor: '#3B82F6', backgroundColor: 'rgba(59, 130, 246, 0.15)', yAxisID: 'y', fill: true, tension: 0.2, spanGaps: false, order: 1 },
+                        { label: '순간 변동량', data: processedDiffs, type: 'bar', barThickness: 6, minBarLength: 5, borderRadius: 1, backgroundColor: context => {
+                                if (!context.raw || context.raw.y === null) return 'rgba(0,0,0,0)';
+                                if (context.raw.y === 0) return 'rgba(107, 114, 128, 0.8)'; 
+                                return context.raw.y < 0 ? 'rgba(239, 68, 68, 0.9)' : 'rgba(16, 185, 129, 0.9)';
+                            }, yAxisID: 'y1', order: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { type: 'linear', min: globalXMin, max: globalXMax, ticks: { stepSize: 2, callback: function(value) {
+                                    if (value === 0 || value === 24) return '자정'; if (value === 12) return '정오';
+                                    return value < 12 ? `오전 ${value}시` : `오후 ${value - 12}시`;
+                                }, color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { type: 'linear', display: true, position: 'right', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#3B82F6', font: { weight: 'bold' } }, min: yMinAdjusted, max: yMaxAdjusted },
+                        y1: { type: 'linear', display: true, position: 'left', grid: { drawOnChartArea: false }, ticks: { color: '#9ca3af' }, min: y1MinAdjusted, max: y1MaxAdjusted }
+                    },
+                    plugins: { 
+                        legend: { labels: { color: '#d1d5db', font: { family: "'Pretendard', sans-serif" } } },
+                        tooltip: { backgroundColor: 'rgba(15, 17, 21, 0.95)', titleColor: '#F59E0B', bodyColor: '#e5e7eb', borderColor: '#374151', borderWidth: 1, padding: 10,
+                            callbacks: {
+                                title: function(context) { if (!context.length || !context[0].raw || !context[0].raw.rawTime) return ''; return context[0].raw.rawTime + " 측정"; },
+                                label: function(context) {
+                                    if (context.raw.y === null) return null; let label = context.dataset.label || ''; if (label) label += ': ';
+                                    if (context.raw.y !== null) { if (context.raw.y === 0 && context.datasetIndex === 1) { label += '0 (미변동)'; } else { label += context.raw.y > 0 && context.datasetIndex === 1 ? '+' + context.raw.y : context.raw.y; } }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            renderOverlayMemos();
+        }
+
+        function drawDecreaseChart(history) {
+            const ctx = document.getElementById('decreaseChart').getContext('2d');
+            if(myDecreaseChart) myDecreaseChart.destroy();
+
+            const decreaseItems = history.filter(h => h.diff < 0).sort((a, b) => timeToDecimal(a.time) - timeToDecimal(b.time));
+            const decreasePoints = decreaseItems.map(h => ({ x: timeToDecimal(h.time), y: Math.abs(h.diff), rawTime: h.time, actualDiff: h.diff, pointVal: h.point, status: h.status }));
+
+            myDecreaseChart = new Chart(ctx, {
+                type: 'bar',
+                data: { datasets: [{ label: '하락/소모량 크기', data: decreasePoints, backgroundColor: 'rgba(239, 68, 68, 0.8)', borderColor: '#F59E0B', borderWidth: 1.5, borderRadius: 2, barThickness: 10, order: 1 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'linear', min: globalXMin, max: globalXMax, ticks: { stepSize: 2, callback: function(value) { if (value === 0 || value === 24) return '자정'; if (value === 12) return '정오'; return value < 12 ? `오전 ${value}시` : `오후 ${value - 12}시`; }, color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { type: 'linear', display: true, position: 'left', title: { display: true, text: '감소 수치', color: '#EF4444' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#EF4444', font: { weight: 'bold' } }, beginAtZero: true }
+                    },
+                    plugins: { legend: { labels: { color: '#d1d5db' } } }
+                }
+            });
+        }
+
+        function drawBaseDecreaseChart(history) {
+            const ctx = document.getElementById('baseDecreaseChart').getContext('2d');
+            if(myBaseDecreaseChart) myBaseDecreaseChart.destroy();
+
+            const baseDecreaseItems = history.filter(h => h.baseDiff && h.baseDiff !== 0).sort((a, b) => timeToDecimal(a.time) - timeToDecimal(b.time));
+            const decreasePoints = baseDecreaseItems.map(h => ({ x: timeToDecimal(h.time), y: Math.abs(h.baseDiff), rawTime: h.time, actualDiff: h.baseDiff, baseVal: h.baseAbs, status: h.status }));
+
+            myBaseDecreaseChart = new Chart(ctx, {
+                type: 'bar',
+                data: { datasets: [{
+                        label: '베이스 변동량 크기', data: decreasePoints,
+                        backgroundColor: context => { if (!context.raw) return 'rgba(59, 130, 246, 0.8)'; return context.raw.actualDiff < 0 ? 'rgba(239, 68, 68, 0.8)' : 'rgba(59, 130, 246, 0.8)'; },
+                        borderColor: context => { if (!context.raw) return '#2563EB'; return context.raw.actualDiff < 0 ? '#DC2626' : '#2563EB'; },
+                        borderWidth: 1.5, borderRadius: 2, barThickness: 10, order: 1
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'linear', min: globalXMin, max: globalXMax, ticks: { stepSize: 2, callback: function(value) { if (value === 0 || value === 24) return '자정'; if (value === 12) return '정오'; return value < 12 ? `오전 ${value}시` : `오후 ${value - 12}시`; }, color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { type: 'linear', display: true, position: 'left', title: { display: true, text: '베이스 변동 수치', color: '#3B82F6' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#3B82F6', font: { weight: 'bold' } }, beginAtZero: true }
+                    },
+                    plugins: { legend: { labels: { color: '#d1d5db' } } }
+                }
+            });
+        }
+
+        function renderLogTable(history) {
+            const tbody = document.getElementById('logTableBody');
+            tbody.innerHTML = '';
+
+            if (history.length === 0) return tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#6b7280; padding: 20px;">선택한 일자의 변동 내역이 없습니다.</td></tr>';
+
+            const reversed = [...history].reverse();
+            reversed.forEach(h => {
+                const tr = document.createElement('tr');
+                let diffClass = h.diff > 0 ? 'text-up' : (h.diff < 0 ? 'text-down' : '');
+                let diffStr = h.diff > 0 ? '+' + h.diff : h.diff;
+                
+                let combinedStatus = h.status;
+                if (h.baseDiff !== 0) {
+                    let baseFormat = h.baseDiff > 0 ? `(+${h.baseDiff})` : `(${h.baseDiff})`;
+                    combinedStatus = `<span style="color:#3B82F6; font-weight:bold;">[Base ${baseFormat}]</span> ` + combinedStatus;
+                }
+
+                tr.innerHTML = `
+                    <td style="color:#9ca3af;">${h.time}</td>
+                    <td style="font-weight:600; color:#F59E0B;">${h.point.toLocaleString()}</td>
+                    <td class="${diffClass}">${diffStr}</td>
+                    <td style="color:#d1d5db;">${combinedStatus}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function parseFileInfo(file) {
+            const match = file.name.match(/_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})_/);
+            if (match) {
+                const dateObj = new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), parseInt(match[4], 10), parseInt(match[5], 10), parseInt(match[6], 10));
+                return { file: file, dateStr: `${match[1]}-${match[2]}-${match[3]}`, timeStr: `${match[4]}:${match[5]}:${match[6]}`, timestamp: dateObj.getTime() };
+            }
+            return null;
+        }
+
+        async function runBatchAnalysis() {
+            const fileInput = document.getElementById('imgUpload');
+            const files = fileInput.files;
+
+            if (files.length < 2) return alert("비교하려면 스샷이 최소 2장 이상은 있어야지.");
+
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const loadingText = document.getElementById('loadingText');
+            analyzeBtn.disabled = true; loadingText.style.display = "block";
+
+            const errorThreshold = parseInt(document.getElementById('errorThreshold').value, 10) || 1000000;
+
+            try {
+                let parsedFiles = [];
+                for (let i = 0; i < files.length; i++) { const info = parseFileInfo(files[i]); if (info) parsedFiles.push(info); }
+                parsedFiles.sort((a, b) => a.timestamp - b.timestamp);
+
+                const CHUNK_SIZE = 4;
+                const ocrResults = [];
+
+                for (let i = 0; i < parsedFiles.length; i += CHUNK_SIZE) {
+                    const chunk = parsedFiles.slice(i, i + CHUNK_SIZE);
+                    loadingText.innerText = `OCR 병렬 스캔 중... (${i + 1} ~ ${Math.min(i + CHUNK_SIZE, parsedFiles.length)} / ${parsedFiles.length})`;
+
+                    const promises = chunk.map(async (info) => {
+                        try {
+                            const worker = await Tesseract.createWorker('eng');
+                            const ret = await worker.recognize(info.file);
+                            const data = extractUserData(ret.data.text);
+                            await worker.terminate();
+                            return { info: info, data: data, success: true };
+                        } catch (err) {
+                            console.warn("파일 분석 중 에러 발생으로 스킵:", info.file.name, err);
+                            return { info: info, data: {}, success: false };
+                        }
+                    });
+
+                    const chunkResults = await Promise.all(promises);
+                    ocrResults.push(...chunkResults);
+                }
+
+                loadingText.innerText = "데이터 분석 및 누적 중...";
+                let totalLogsAdded = 0;
+                let existingLogs = memoryLogs; 
+
+                ocrResults.forEach(res => { if (res.success) { Object.keys(res.data).forEach(name => masterUserList.add(name)); } });
+                safeSetStorage('clanMasterUsers', JSON.stringify(Array.from(masterUserList)));
+
+                for (let i = 1; i < ocrResults.length; i++) {
+                    const prev = ocrResults[i - 1]; const curr = ocrResults[i];
+                    if (!prev.success || !curr.success || Object.keys(prev.data).length === 0 || Object.keys(curr.data).length === 0) continue;
+
+                    const timeDiffSec = (curr.info.timestamp - prev.info.timestamp) / 1000;
+                    if (timeDiffSec > 0) {
+                        const analysisLogs = compareData(prev.data, curr.data, prev.info.timeStr, curr.info.timeStr, errorThreshold);
+                        if (analysisLogs.length > 0) {
+                            existingLogs += `\n========== [날짜: ${curr.info.dateStr}] [비교 구간: ${prev.info.timeStr} -> ${curr.info.timeStr}] ==========\n* 간격: ${timeDiffSec}초\n` + analysisLogs.join('\n') + "\n";
+                            totalLogsAdded++;
+                        }
+                    }
+                }
+
+                memoryLogs = existingLogs; saveMemoryLogs();
+                if (totalLogsAdded > 0) alert(`분석 완료! 변동 구간 ${totalLogsAdded}개 감지됨. 대시보드를 갱신할게.`); else alert("분석 완료. 변동된 데이터가 없었어.");
+                refreshDashboard();
+            } catch (error) {
+                console.error(error); alert("오류 발생. 파일 형식을 다시 확인해봐.");
+            } finally {
+                analyzeBtn.disabled = false; loadingText.style.display = "none"; fileInput.value = "";
+            }
+        }
+
+        function extractUserData(rawText) {
+            const lines = rawText.split('\n'); const userData = {}; const presetList = getPresetList();
+            const thresholdVal = parseInt(document.getElementById('presetThreshold').value, 10) || 50; const minSimilarity = thresholdVal / 100;
+            const regex = /^\s*([a-zA-Z0-9_\-\.]{2,})\s+([\d\.,]+)(?:\s+([\d\.,]+))?/; 
+
+            lines.forEach(line => {
+                const match = line.match(regex);
+                if (match) {
+                    const scannedName = match[1].toUpperCase(); const point = parseInt(match[2].replace(/[\.,]/g, ''), 10);
+                    const base = match[3] ? parseInt(match[3].replace(/[\.,]/g, ''), 10) : 0; 
+                    if (!isNaN(point)) userData[findBestMatch(scannedName, presetList, minSimilarity)] = { point: point, base: isNaN(base) ? 0 : base }; 
+                }
+            });
+            return userData;
+        }
+
+        function compareData(data1, data2, time1, time2, threshold) {
+            const logs = [];
+            for (const [name, info1] of Object.entries(data1)) {
+                if (data2[name] !== undefined) {
+                    const info2 = data2[name]; const diff = info2.point - info1.point; const baseDiff = info2.base - info1.base;
+                    if (Math.abs(diff) > threshold || Math.abs(baseDiff) > threshold) continue; 
+
+                    let status = "";
+                    if (diff < -1000) status = "[급락] 전멸/피격 의심";
+                    else if (diff < 0) status = "[지속 감소] 직접 공격 중 확정 (100% 온라인)";
+                    else if (diff > 0) status = "[증가] 생산 예약/완료";
+
+                    if (baseDiff !== 0) status = (status ? status + " + " : "") + "[베이스 활동 감지 - 100% 온라인]";
+                    if (diff === 0 && baseDiff === 0) status = "[미변동] 유지 중"; else if (status === "") status = "[변동 감지]";
+
+                    logs.push(`- User: ${name.padEnd(12)} | Point: ${info1.point} -> ${info2.point} (변동: ${diff > 0 ? `+${diff}` : diff}) | Base: ${info1.base} -> ${info2.base} (변동: ${baseDiff > 0 ? `+${baseDiff}` : baseDiff}) | 상태: ${status}`);
+                }
+            }
+            return logs;
+        }
+
+        function loadTXT() {
+            const fileInput = document.getElementById('txtInput'); const file = fileInput.files[0];
+            if (!file) return alert("불러올 .txt 파일을 올려야지.");
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                memoryLogs += "\n" + e.target.result; saveMemoryLogs(); refreshDashboard();
+                alert("데이터 장착 완료. 대시보드를 갱신했어."); fileInput.value = ""; 
+            };
+            reader.readAsText(file, "UTF-8");
+        }
+
+        function downloadTXT() {
+            if (!memoryLogs) return alert("다운받을 데이터가 없다.");
+            const blob = new Blob([memoryLogs], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob); const a = document.createElement("a");
+            a.href = url; a.download = "클랜_활동기록_누적데이터(베이스포함_V3).txt"; a.click(); URL.revokeObjectURL(url);
+        }
+
+        function clearLogs() {
+            if(confirm("진짜 싹 다 날림? (복구 불가)")) {
+                memoryLogs = ""; saveMemoryLogs(); try { localStorage.removeItem('clanMasterUsers'); } catch(e){}
+                masterUserList.clear(); refreshDashboard(); document.getElementById('dashboardBox').style.display = 'none'; document.getElementById('emptyDashboard').style.display = 'flex';
+            }
+        }
+        
+        function deleteCurrentUser() {
+            if (!currentSelectedUser) return;
+            if (!confirm(`정말 '${currentSelectedUser}' 유저의 모든 데이터(기록, 목록)를 삭제할까? (복구 불가)`)) return;
+
+            masterUserList.delete(currentSelectedUser); safeSetStorage('clanMasterUsers', JSON.stringify(Array.from(masterUserList)));
+
+            const safeTarget = currentSelectedUser.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+            memoryLogs = memoryLogs.split('\n').filter(line => !(new RegExp(`- User:\\s+${safeTarget}\\s+\\|`)).test(line)).join('\n');
+            saveMemoryLogs();
+            
+            document.getElementById('rawLogArea').value = memoryLogs; rawParsedData = rawParsedData.filter(log => log.name !== currentSelectedUser); delete parsedData[currentSelectedUser];
+
+            currentSelectedUser = ''; currentUserHistory = [];
+            document.getElementById('dashboardBox').style.display = 'none'; document.getElementById('emptyDashboard').style.display = 'flex'; document.getElementById('deleteUserBtn').style.display = 'none';
+
+            renderUserGrid(); alert(`${safeTarget} 유저의 데이터가 깔끔하게 삭제됐어.`);
+        }
+    </script>
+</body>
+</html>
